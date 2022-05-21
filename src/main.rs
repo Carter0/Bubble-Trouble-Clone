@@ -17,6 +17,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_startup_system(spawn_player)
         .add_startup_system(spawn_floor_and_walls)
+        // .add_startup_system(spawn_ball)
         .add_system(player_movement)
         .add_system(spawn_bullets)
         .add_system(move_bullets)
@@ -80,6 +81,19 @@ fn player_movement(
     }
 }
 
+// This makes everything lag :(
+// fn spawn_ball(mut commands: Commands) {
+//     /* Set the restitution coefficient and restitution combine rule
+//     when the collider is created. */
+//     commands
+//         .spawn()
+//         .insert(Collider::ball(0.5))
+//         .insert(Restitution {
+//             coefficient: 0.7,
+//             combine_rule: CoefficientCombineRule::Min,
+//         });
+// }
+
 #[derive(Component)]
 struct Bullet;
 
@@ -134,8 +148,8 @@ fn move_bullets(mut bullet_positions_query: Query<&mut Transform, With<Bullet>>)
 // If a bullet goes off screen destroy it
 fn despawn_bullets(
     mut commands: Commands,
-    bullets_query: Query<(Entity, &Transform), With<Bullet>>)
-{
+    bullets_query: Query<(Entity, &Transform), With<Bullet>>,
+) {
     for (entity, transform) in bullets_query.iter() {
         if transform.translation.y > WINDOWHEIGHT {
             commands.entity(entity).despawn();
