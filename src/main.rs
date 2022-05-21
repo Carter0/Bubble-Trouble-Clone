@@ -1,8 +1,8 @@
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 
-const WINDOWHEIGHT: f32 = 1200.0;
-const WINDOWWIDTH: f32 = 1500.0;
+const WINDOWHEIGHT: f32 = 1000.0;
+const WINDOWWIDTH: f32 = 1200.0;
 
 // NOTE the units are pixels for pretty much the whole thing, rapier now deals with the conversion to meters in the backend
 
@@ -18,6 +18,9 @@ fn main() {
         .add_startup_system(spawn_player)
         .add_startup_system(spawn_floor_and_walls)
         .add_system(player_movement)
+        .add_system(spawn_bullets)
+        .add_system(move_bullets)
+        .add_system(despawn_bullets)
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         // .add_plugin(RapierDebugRenderPlugin::default())
         .run();
@@ -28,8 +31,10 @@ fn main() {
 struct Player(f32);
 
 fn spawn_player(mut commands: Commands, mut rapier_config: ResMut<RapierConfiguration>) {
-    // Set gravity to 0.0 and spawn camera.
-    rapier_config.gravity = Vec2::ZERO;
+    // NOTE not really sure why gravity needs to be so big
+    // But I think its dividing by the pixels per meter
+    // TODO should I turn off gravity when the player is colliding with the floor?
+    rapier_config.gravity = Vec2::new(0.0, -1000.0);
     commands
         .spawn()
         .insert_bundle(OrthographicCameraBundle::new_2d());
@@ -45,6 +50,7 @@ fn spawn_player(mut commands: Commands, mut rapier_config: ResMut<RapierConfigur
                 custom_size: Some(Vec2::new(sprite_size, sprite_size)),
                 ..Default::default()
             },
+            transform: Transform::from_xyz(0.0, -WINDOWHEIGHT / 2.0 + WINDOWHEIGHT / 20.0, 1.0),
             ..Default::default()
         })
         .insert(RigidBody::Dynamic)
@@ -58,15 +64,12 @@ fn player_movement(
     mut player_info: Query<(&Player, &mut Velocity)>,
 ) {
     for (player, mut rb_vels) in player_info.iter_mut() {
-        let up = keyboard_input.pressed(KeyCode::W) || keyboard_input.pressed(KeyCode::Up);
-        let down = keyboard_input.pressed(KeyCode::S) || keyboard_input.pressed(KeyCode::Down);
         let left = keyboard_input.pressed(KeyCode::A) || keyboard_input.pressed(KeyCode::Left);
         let right = keyboard_input.pressed(KeyCode::D) || keyboard_input.pressed(KeyCode::Right);
 
         let x_axis = -(left as i8) + right as i8;
-        let y_axis = -(down as i8) + up as i8;
 
-        let mut move_delta = Vec2::new(x_axis as f32, y_axis as f32);
+        let mut move_delta = Vec2::new(x_axis as f32, 0.0);
         if move_delta != Vec2::ZERO {
             move_delta /= move_delta.length();
         }
@@ -77,20 +80,123 @@ fn player_movement(
     }
 }
 
+#[derive(Component)]
+struct Bullet;
+
+fn spawn_bullets(
+    keyboard_input: Res<Input<KeyCode>>,
+    player_transform: Query<&Transform, With<Player>>,
+    mut commands: Commands,
+) {
+    let transform: &Transform = player_transform.single();
+    let spawn_position_x = transform.translation.x;
+    let spawn_position_y = transform.translation.y + 40.0;
+
+    let bullet_size_width = 10.0;
+    let bullet_size_height = 30.0;
+
+    let up = keyboard_input.just_pressed(KeyCode::W) || keyboard_input.just_pressed(KeyCode::Up);
+
+    // TODO might want to limit the total number of bullets that can be
+    // on screen at any time
+    if up {
+        commands
+            .spawn_bundle(SpriteBundle {
+                sprite: Sprite {
+                    color: Color::rgb(10.0, 70.0, 70.0),
+                    custom_size: Some(Vec2::new(bullet_size_width, bullet_size_height)),
+                    ..Default::default()
+                },
+                transform: Transform::from_xyz(spawn_position_x, spawn_position_y, 1.0),
+                ..Default::default()
+            })
+            .insert(Collider::cuboid(
+                bullet_size_width / 2.0,
+                bullet_size_height / 2.0,
+            ))
+            .insert(RigidBody::KinematicPositionBased)
+            .insert(Bullet);
+    }
+}
+
+// NOTE
+// For position-based kinematic bodies, it is recommended to modify its Transform
+// (changing its velocity won’t have any effect). This will let the physics
+// engine compute the fictitious velocity of the kinematic body for more realistic
+// intersections with other rigid-bodies.
+fn move_bullets(mut bullet_positions_query: Query<&mut Transform, With<Bullet>>) {
+    // TODO might want to make the position change relevative to the screen?
+    for mut position in bullet_positions_query.iter_mut() {
+        position.translation.y += 3.5;
+    }
+}
+
+// If a bullet goes off screen destroy it
+fn despawn_bullets(
+    mut commands: Commands,
+    bullets_query: Query<(Entity, &Transform), With<Bullet>>)
+{
+    for (entity, transform) in bullets_query.iter() {
+        if transform.translation.y > WINDOWHEIGHT {
+            commands.entity(entity).despawn();
+            println!("Despawned the entity");
+        }
+    }
+}
+
 fn spawn_floor_and_walls(mut commands: Commands) {
-    let sprite_size_x = WINDOWWIDTH;
-    let sprite_size_y = 40.0;
+    // The floor
+    let floor_size_x = WINDOWWIDTH;
+    let floor_size_y = 40.0;
 
     commands
         .spawn()
         .insert_bundle(SpriteBundle {
             sprite: Sprite {
                 color: Color::rgb(10.0, 70.0, 70.0),
-                custom_size: Some(Vec2::new(sprite_size_x, sprite_size_y)),
+                custom_size: Some(Vec2::new(floor_size_x, floor_size_y)),
                 ..Default::default()
             },
-            transform: Transform::from_xyz(0.0, -500.0, 1.0),
+            transform: Transform::from_xyz(0.0, -WINDOWHEIGHT / 2.0, 1.0),
             ..Default::default()
         })
-        .insert(Collider::cuboid(sprite_size_x / 2.0, sprite_size_y / 2.0));
+        .insert(Collider::cuboid(floor_size_x / 2.0, floor_size_y / 2.0));
+
+    // The Left Wall
+    let left_wall_size_x = 40.0;
+    let left_wall_size_y = WINDOWHEIGHT;
+    commands
+        .spawn()
+        .insert_bundle(SpriteBundle {
+            sprite: Sprite {
+                color: Color::rgb(10.0, 70.0, 70.0),
+                custom_size: Some(Vec2::new(left_wall_size_x, left_wall_size_y)),
+                ..Default::default()
+            },
+            transform: Transform::from_xyz(-WINDOWWIDTH / 2.0, 0.0, 1.0),
+            ..Default::default()
+        })
+        .insert(Collider::cuboid(
+            left_wall_size_x / 2.0,
+            left_wall_size_y / 2.0,
+        ));
+
+    // The Right Wall
+    let right_wall_size_x = 40.0;
+    let right_wall_size_y = WINDOWHEIGHT;
+    commands
+        .spawn()
+        .insert_bundle(SpriteBundle {
+            sprite: Sprite {
+                color: Color::rgb(10.0, 70.0, 70.0),
+                custom_size: Some(Vec2::new(left_wall_size_x, left_wall_size_y)),
+                ..Default::default()
+            },
+            transform: Transform::from_xyz(WINDOWWIDTH / 2.0, 0.0, 1.0),
+            ..Default::default()
+        })
+        .insert(Collider::cuboid(
+            right_wall_size_x / 2.0,
+            right_wall_size_y / 2.0,
+        ));
 }
