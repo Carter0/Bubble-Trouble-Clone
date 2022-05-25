@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy_prototype_lyon::prelude::*;
 use bevy_rapier2d::prelude::*;
 
 const WINDOWHEIGHT: f32 = 1000.0;
@@ -15,9 +16,10 @@ fn main() {
             ..Default::default()
         })
         .add_plugins(DefaultPlugins)
+        .add_plugin(ShapePlugin)
         .add_startup_system(spawn_player)
         .add_startup_system(spawn_floor_and_walls)
-        // .add_startup_system(spawn_ball)
+        .add_startup_system(spawn_ball)
         .add_system(player_movement)
         .add_system(spawn_bullets)
         .add_system(move_bullets)
@@ -81,18 +83,34 @@ fn player_movement(
     }
 }
 
-// This makes everything lag :(
-// fn spawn_ball(mut commands: Commands) {
-//     /* Set the restitution coefficient and restitution combine rule
-//     when the collider is created. */
-//     commands
-//         .spawn()
-//         .insert(Collider::ball(0.5))
-//         .insert(Restitution {
-//             coefficient: 0.7,
-//             combine_rule: CoefficientCombineRule::Min,
-//         });
-// }
+// Set the restitution coefficient and restitution combine rule
+// when the collider is created.
+// Restitution determines how bouncy the ball is.
+fn spawn_ball(mut commands: Commands) {
+    let circle_radius = 10.0;
+
+    let circle = shapes::Circle {
+        radius: circle_radius,
+        center: Vec2::new(0.0, 0.0),
+    };
+
+    commands
+        .spawn()
+        .insert(Collider::ball(circle_radius))
+        .insert(Restitution {
+            coefficient: 1.0,
+            combine_rule: CoefficientCombineRule::Max,
+        })
+        .insert(RigidBody::Dynamic)
+        .insert_bundle(GeometryBuilder::build_as(
+            &circle,
+            DrawMode::Outlined {
+                fill_mode: bevy_prototype_lyon::prelude::FillMode::color(Color::ORANGE_RED),
+                outline_mode: StrokeMode::new(Color::ORANGE_RED, 10.0),
+            },
+            Transform::default(),
+        ));
+}
 
 #[derive(Component)]
 struct Bullet;
