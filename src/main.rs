@@ -36,7 +36,6 @@ struct Player(f32);
 fn spawn_player(mut commands: Commands, mut rapier_config: ResMut<RapierConfiguration>) {
     // NOTE not really sure why gravity needs to be so big
     // But I think its dividing by the pixels per meter
-    // TODO should I turn off gravity when the player is colliding with the floor?
     rapier_config.gravity = Vec2::new(0.0, -1000.0);
     commands
         .spawn()
@@ -83,6 +82,9 @@ fn player_movement(
     }
 }
 
+#[derive(Component)]
+struct Ball;
+
 // Set the restitution coefficient and restitution combine rule
 // when the collider is created.
 // Restitution determines how bouncy the ball is.
@@ -109,7 +111,8 @@ fn spawn_ball(mut commands: Commands) {
                 outline_mode: StrokeMode::new(Color::ORANGE_RED, 10.0),
             },
             Transform::default(),
-        ));
+        ))
+        .insert(Ball);
 }
 
 #[derive(Component)]
@@ -120,7 +123,7 @@ fn spawn_bullets(
     player_transform: Query<&Transform, With<Player>>,
     mut commands: Commands,
 ) {
-    let transform: &Transform = player_transform.single();
+    let transform = player_transform.single();
     let spawn_position_x = transform.translation.x;
     let spawn_position_y = transform.translation.y + 40.0;
 
@@ -159,9 +162,41 @@ fn spawn_bullets(
 fn move_bullets(mut bullet_positions_query: Query<&mut Transform, With<Bullet>>) {
     // TODO might want to make the position change relevative to the screen?
     for mut position in bullet_positions_query.iter_mut() {
-        position.translation.y += 3.5;
+        position.translation.y += 4.5;
     }
 }
+
+// If a bullet collides with a ball then destroy both the bullet and the ball.
+// fn bullet_ball_collisions(bullet_positions_query: Query<&Transform, With<Bullet>>, ball_position_query) {
+
+// }
+
+// TODO Probably want to do something like this?
+// Make sure to enable collision events on the ball and maybe something else
+
+// fn handle_events(
+//     ball_query: Query<(Entity, &Ball), With<Ball>>,
+//     bullet_query: ...
+//     mut contact_events: EventReader<CollisionEvent>,
+//     mut commands: Commands
+// ) {
+//
+//    let ball_entity = DOTHING
+//
+//     for contact_event in contact_events.iter() {
+//         for bullet_entity in bullet_query.iter() {
+//             if let CollisionEvent::Started(e1, e2, _event_flag) = contact_event {
+//                 if e1 == &ball and e2 == &bullet {
+//                     commands.entity(e1).despawn();
+//                     commands.entity(e2).despawn();
+//                 }
+//             }
+//         }
+//     }
+// }
+
+
+
 
 // If a bullet goes off screen destroy it
 fn despawn_bullets(
