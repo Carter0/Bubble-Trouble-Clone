@@ -111,7 +111,7 @@ fn spawn_ball(mut commands: Commands) {
                 fill_mode: bevy_prototype_lyon::prelude::FillMode::color(Color::ORANGE_RED),
                 outline_mode: StrokeMode::new(Color::ORANGE_RED, 10.0),
             },
-            Transform::default(),
+            Transform::from_xyz(WINDOWWIDTH / 3.0, WINDOWHEIGHT / 2.0, 1.0),
         ))
         .insert(Ball);
 }
@@ -175,13 +175,12 @@ fn check_collisions(
     rapier_context: Res<RapierContext>,
     bullet_entities_query: Query<Entity, With<Bullet>>,
     ball_entities_query: Query<Entity, With<Ball>>,
+    player_entity_query: Query<Entity, With<Player>>,
     mut commands: Commands,
 ) {
-    // let entity1 = ...; // A first entity with a collider attached.
-    // let entity2 = ...; // A second entity with a collider attached.
-
-    for bullet_entity in bullet_entities_query.iter() {
-        for ball_entity in ball_entities_query.iter() {
+    let player_entity = player_entity_query.single();
+    for ball_entity in ball_entities_query.iter() {
+        for bullet_entity in bullet_entities_query.iter() {
             // If a bullet collides with a ball then destroy both the bullet and the ball.
             if let Some(contact_pair) = rapier_context.contact_pair(bullet_entity, ball_entity) {
                 // The contact pair exists meaning that the broad-phase identified a potential contact.
@@ -193,6 +192,15 @@ fn check_collisions(
                     // TODO probs want to kick off a new event here for when a ball is hit
                     commands.entity(ball_entity).despawn();
                 }
+            }
+        }
+
+        if let Some(contact_pair) = rapier_context.contact_pair(ball_entity, player_entity) {
+            if contact_pair.has_any_active_contacts() {
+                // TODO when the player gets hit, the game shuts down because we are doing queries that expect
+                // exactly one player to be alive at all times.
+                // This is fine for now, but later on we should have some kind of restart feature and also some kind of menu for restarting
+                commands.entity(player_entity).despawn();
             }
         }
     }
