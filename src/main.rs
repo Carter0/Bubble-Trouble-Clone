@@ -24,6 +24,7 @@ fn main() {
         .add_system(spawn_bullets)
         .add_system(move_bullets)
         .add_system(despawn_bullets)
+        .add_system(check_collisions)
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         // .add_plugin(RapierDebugRenderPlugin::default())
         .run();
@@ -166,37 +167,36 @@ fn move_bullets(mut bullet_positions_query: Query<&mut Transform, With<Bullet>>)
     }
 }
 
-// If a bullet collides with a ball then destroy both the bullet and the ball.
-// fn bullet_ball_collisions(bullet_positions_query: Query<&Transform, With<Bullet>>, ball_position_query) {
+// NOTE I am going to be checking all collisions in bevy rapier in the same system
+// by doing checks for the entities that might have special logic when they collide together
+// I don't love this approach, but I feel like Bevy Rapier pushes me in this direction.
+// I wish it was more flexible, but it is good enough for now.
+fn check_collisions(
+    rapier_context: Res<RapierContext>,
+    bullet_entities_query: Query<Entity, With<Bullet>>,
+    ball_entities_query: Query<Entity, With<Ball>>,
+    mut commands: Commands,
+) {
+    // let entity1 = ...; // A first entity with a collider attached.
+    // let entity2 = ...; // A second entity with a collider attached.
 
-// }
+    for bullet_entity in bullet_entities_query.iter() {
+        for ball_entity in ball_entities_query.iter() {
+            // If a bullet collides with a ball then destroy both the bullet and the ball.
+            if let Some(contact_pair) = rapier_context.contact_pair(bullet_entity, ball_entity) {
+                // The contact pair exists meaning that the broad-phase identified a potential contact.
+                if contact_pair.has_any_active_contacts() {
+                    // The contact pair has active contacts, meaning that it
+                    // contains contacts for which contact forces were computed.
+                    commands.entity(bullet_entity).despawn();
 
-// TODO Probably want to do something like this?
-// Make sure to enable collision events on the ball and maybe something else
-
-// fn handle_events(
-//     ball_query: Query<(Entity, &Ball), With<Ball>>,
-//     bullet_query: ...
-//     mut contact_events: EventReader<CollisionEvent>,
-//     mut commands: Commands
-// ) {
-//
-//    let ball_entity = DOTHING
-//
-//     for contact_event in contact_events.iter() {
-//         for bullet_entity in bullet_query.iter() {
-//             if let CollisionEvent::Started(e1, e2, _event_flag) = contact_event {
-//                 if e1 == &ball and e2 == &bullet {
-//                     commands.entity(e1).despawn();
-//                     commands.entity(e2).despawn();
-//                 }
-//             }
-//         }
-//     }
-// }
-
-
-
+                    // TODO probs want to kick off a new event here for when a ball is hit
+                    commands.entity(ball_entity).despawn();
+                }
+            }
+        }
+    }
+}
 
 // If a bullet goes off screen destroy it
 fn despawn_bullets(
