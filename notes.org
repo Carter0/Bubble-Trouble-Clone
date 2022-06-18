@@ -1,0 +1,44 @@
+#+title: Notes
+
+* Plan for the Bouncing Balls
+
+When a ball is shot, it should split into 2 smaller balls unless it is already as small as it can be.
+
+I think the ball struct should contain a notion of how small it is.
+
+So it would be something like...
+
+#+begin_src rust
+
+struct Ball {
+    // Range from 1-5 or something.
+    // The higher numbers would indicate a larger ball
+    // If size is 1, then it is the smallest ball and can be destroyed if hit
+    size: u8
+}
+#+end_src
+
+I think that's all the ball needs to know about itself.
+
+The actual size of the ball would be handled by a system that checks for what size the ball being spawned in is and then
+generates a transform that is the appropriate size.
+
+That leads into the other upcoming problem which is how am I going to handle the ball spawning.
+
+
+* Plan for Spawning Balls
+
+A ball needs to be spawned when a larger ball is "popped" and when a level is started.
+
+Since I really have no idea how I am going to handle the levels at all right now, I think I am going to just focus on the first case: how to spawn a ball
+when a larger ball is popped.
+
+I think you should do it with an event. You have some good notes on events in your bevy_notes org file. But basically, you need to declare the event,
+write the event, and read the event. Declaring the event and writing the event don't seem very difficult, just copy your previous examples.
+
+You can send the event with the ball entity on it then when you read in the event you can grab the ball itself along with any components on it with
+component_query.get_mut(entity);
+
+So just grab the Ball and the transform of the entity of the ball that just got popped then...
+1. Destroy the current ball
+2. Spawn two new balls with a size - 1 and a transform that it smaller and give them a push to the left and right.
