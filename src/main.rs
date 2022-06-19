@@ -1,19 +1,18 @@
 use bevy::prelude::*;
 use bevy_prototype_lyon::prelude::*;
 use bevy_rapier2d::prelude::*;
-// use std::collections::HashMap;
+use std::collections::HashMap;
 
 const WINDOWHEIGHT: f32 = 1000.0;
 const WINDOWWIDTH: f32 = 1200.0;
-// const BALLMAPPINGS: HashMap<u8, f32> = HashMap::from([
-//     (1, 0.4),
-//     (2, 0.7),
-//     (3, 1.0),
-//     (4, 1.5),
-// ]);
-
 
 // NOTE the units are pixels for pretty much the whole thing, rapier now deals with the conversion to meters in the backend
+
+#[derive(Default)]
+struct BallMappingResource {
+    ball_radii: HashMap<u8, f32>,
+    ball_colors: HashMap<u8, Color>,
+}
 
 fn main() {
     App::new()
@@ -28,6 +27,16 @@ fn main() {
         .add_startup_system(spawn_player)
         .add_startup_system(spawn_floor_and_walls)
         .add_startup_system(spawn_starting_ball)
+        .insert_resource(BallMappingResource {
+            ball_radii: HashMap::from([(1, 10.0), (2, 15.0), (3, 25.0), (4, 35.0), (5, 50.0)]),
+            ball_colors: HashMap::from([
+                (1, Color::ORANGE_RED),
+                (2, Color::AQUAMARINE),
+                (3, Color::FUCHSIA),
+                (4, Color::BEIGE),
+                (5, Color::BISQUE),
+            ]),
+        })
         .add_event::<SpawnBallEvent>()
         .add_system(spawn_ball)
         .add_system(player_movement)
@@ -104,17 +113,20 @@ struct Ball {
 // Set the restitution coefficient and restitution combine rule
 // when the collider is created.
 // Restitution determines how bouncy the ball is.
-fn spawn_starting_ball(mut commands: Commands) {
-    let circle_radius = 15.0;
+fn spawn_starting_ball(mut commands: Commands, ball_mappings_resource: Res<BallMappingResource>) {
+    let new_ball_size = 2;
+    let new_ball_radius = ball_mappings_resource.ball_radii[&new_ball_size];
+    let new_ball_color = ball_mappings_resource.ball_colors[&new_ball_size];
 
     let circle = shapes::Circle {
-        radius: circle_radius,
+        radius: new_ball_radius,
         center: Vec2::new(0.0, 0.0),
     };
 
+    // TODO the starting ball needs to bounce to either the left or the right to start
     commands
         .spawn()
-        .insert(Collider::ball(circle_radius))
+        .insert(Collider::ball(new_ball_radius))
         .insert(Restitution {
             coefficient: 1.0,
             combine_rule: CoefficientCombineRule::Max,
@@ -123,12 +135,12 @@ fn spawn_starting_ball(mut commands: Commands) {
         .insert_bundle(GeometryBuilder::build_as(
             &circle,
             DrawMode::Outlined {
-                fill_mode: bevy_prototype_lyon::prelude::FillMode::color(Color::ORANGE_RED),
-                outline_mode: StrokeMode::new(Color::ORANGE_RED, 10.0),
+                fill_mode: bevy_prototype_lyon::prelude::FillMode::color(new_ball_color),
+                outline_mode: StrokeMode::new(new_ball_color, 10.0),
             },
-            Transform::from_xyz(WINDOWWIDTH / 3.0, WINDOWHEIGHT / 2.0, 1.0),
+            Transform::from_xyz(WINDOWWIDTH / 3.0, WINDOWHEIGHT / 3.0, 1.0),
         ))
-        .insert(Ball { size: 2 });
+        .insert(Ball { size: new_ball_size });
 }
 
 #[derive(Component)]
@@ -228,6 +240,7 @@ fn spawn_ball(
     mut spawn_event: EventReader<SpawnBallEvent>,
     mut spawn_query: Query<(&Transform, &Ball)>,
     mut commands: Commands,
+    ball_mappings_resource: Res<BallMappingResource>,
 ) {
     for event in spawn_event.iter() {
         let entity: Entity = event.0;
@@ -237,22 +250,24 @@ fn spawn_ball(
 
             // Don't spawn a ball if the size is as small as it can go
             if old_ball_size > 1 {
-                let circle_radius = 10.0;
-
-                let circle = shapes::Circle {
-                    radius: circle_radius,
-                    center: Vec2::new(0.0, 0.0),
-                };
-
                 // TODO
                 // So this below isn't really right. We actually want to spawn the balls in the exact same position
                 // But give them some kind of push to the left and right respectively so they bounce in opposite directions.
                 let left_ball_x_position = old_ball_transform.translation.x - WINDOWWIDTH / 16.0;
                 let right_ball_x_position = old_ball_transform.translation.x + WINDOWWIDTH / 16.0;
 
+                let new_ball_size = old_ball_size - 1;
+                let new_ball_radius = ball_mappings_resource.ball_radii[&new_ball_size];
+                let new_ball_color = ball_mappings_resource.ball_colors[&new_ball_size];
+
+                let circle = shapes::Circle {
+                    radius: new_ball_radius,
+                    center: Vec2::new(0.0, 0.0),
+                };
+
                 commands
                     .spawn()
-                    .insert(Collider::ball(circle_radius))
+                    .insert(Collider::ball(new_ball_radius))
                     .insert(Restitution {
                         coefficient: 1.0,
                         combine_rule: CoefficientCombineRule::Max,
@@ -264,16 +279,21 @@ fn spawn_ball(
                             fill_mode: bevy_prototype_lyon::prelude::FillMode::color(
                                 Color::ORANGE_RED,
                             ),
-                            outline_mode: StrokeMode::new(Color::ORANGE_RED, 10.0),
+                            outline_mode: StrokeMode::new(new_ball_color, 10.0),
                         },
-                        Transform::from_xyz(left_ball_x_position, old_ball_transform.translation.y, 1.0),
+                        Transform::from_xyz(
+                            left_ball_x_position,
+                            old_ball_transform.translation.y,
+                            1.0,
+                        ),
                     ))
-                    .insert(Ball { size: 1 });
-
+                    .insert(Ball {
+                        size: new_ball_size,
+                    });
 
                 commands
                     .spawn()
-                    .insert(Collider::ball(circle_radius))
+                    .insert(Collider::ball(new_ball_radius))
                     .insert(Restitution {
                         coefficient: 1.0,
                         combine_rule: CoefficientCombineRule::Max,
@@ -285,11 +305,17 @@ fn spawn_ball(
                             fill_mode: bevy_prototype_lyon::prelude::FillMode::color(
                                 Color::ORANGE_RED,
                             ),
-                            outline_mode: StrokeMode::new(Color::ORANGE_RED, 10.0),
+                            outline_mode: StrokeMode::new(new_ball_color, 10.0),
                         },
-                        Transform::from_xyz(right_ball_x_position, old_ball_transform.translation.y, 1.0),
+                        Transform::from_xyz(
+                            right_ball_x_position,
+                            old_ball_transform.translation.y,
+                            1.0,
+                        ),
                     ))
-                    .insert(Ball { size: 1 });
+                    .insert(Ball {
+                        size: new_ball_size,
+                    });
             }
 
             commands.entity(entity).despawn();
