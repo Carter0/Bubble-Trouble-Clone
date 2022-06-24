@@ -140,7 +140,9 @@ fn spawn_starting_ball(mut commands: Commands, ball_mappings_resource: Res<BallM
             },
             Transform::from_xyz(WINDOWWIDTH / 3.0, WINDOWHEIGHT / 3.0, 1.0),
         ))
-        .insert(Ball { size: new_ball_size });
+        .insert(Ball {
+            size: new_ball_size,
+        });
 }
 
 #[derive(Component)]
@@ -217,7 +219,6 @@ fn check_collisions(
                     // contains contacts for which contact forces were computed.
                     commands.entity(bullet_entity).despawn();
 
-                    // TODO probs want to kick off a new event here for when a ball is hit
                     spawn_event.send(SpawnBallEvent(ball_entity))
                 }
             }
@@ -265,6 +266,8 @@ fn spawn_ball(
                     center: Vec2::new(0.0, 0.0),
                 };
 
+                // TODO I need to add a collision_group to these balls
+                // so that they don't collide with eachother
                 commands
                     .spawn()
                     .insert(Collider::ball(new_ball_radius))
@@ -287,6 +290,13 @@ fn spawn_ball(
                             1.0,
                         ),
                     ))
+                    // membership and then filter
+                    // What group it is a part of and then what group it can interact with
+                    .insert(CollisionGroups::new(0b0000, 0b0000))
+                    .insert(Velocity {
+                        linvel: Vec2::new(-300.0, 50.0),
+                        angvel: 0.0,
+                    })
                     .insert(Ball {
                         size: new_ball_size,
                     });
@@ -313,6 +323,21 @@ fn spawn_ball(
                             1.0,
                         ),
                     ))
+                    // TODO
+                    // This gets the balls to bounce in the right direction.
+                    // But I want them to be more consistent in their "bouncyness".
+                    // When they collide with the ground, I want them to
+                    // continue bouncing with the same speed and distance.
+                    // Like they need to be predictable.
+                    //
+                    // Right now I can tell the velocity is slowing down as it bounces. And I
+                    // really don't want it do that.
+                    // I also need it to bounce more consistently. It should always bounce in the
+                    // direction that it is going unless it hits a wall.
+                    .insert(Velocity {
+                        linvel: Vec2::new(300.0, 50.0),
+                        angvel: 0.0,
+                    })
                     .insert(Ball {
                         size: new_ball_size,
                     });
