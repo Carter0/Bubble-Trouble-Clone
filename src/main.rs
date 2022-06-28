@@ -39,6 +39,7 @@ fn main() {
         })
         .add_event::<SpawnBallEvent>()
         .add_system(spawn_ball)
+        .add_system(show_velocity)
         .add_system(player_movement)
         .add_system(spawn_bullets)
         .add_system(move_bullets)
@@ -126,20 +127,33 @@ fn spawn_starting_ball(mut commands: Commands, ball_mappings_resource: Res<BallM
     // TODO the starting ball needs to bounce to either the left or the right to start
     commands
         .spawn()
-        .insert(Collider::ball(new_ball_radius))
+        .insert(Collider::cuboid(new_ball_radius, new_ball_radius))
         .insert(Restitution {
             coefficient: 1.0,
             combine_rule: CoefficientCombineRule::Max,
         })
         .insert(RigidBody::Dynamic)
-        .insert_bundle(GeometryBuilder::build_as(
-            &circle,
-            DrawMode::Outlined {
-                fill_mode: bevy_prototype_lyon::prelude::FillMode::color(new_ball_color),
-                outline_mode: StrokeMode::new(new_ball_color, 10.0),
+        .insert(LockedAxes::ROTATION_LOCKED)
+        // .insert_bundle(GeometryBuilder::build_as(
+        //     &circle,
+        //     DrawMode::Outlined {
+        //         fill_mode: bevy_prototype_lyon::prelude::FillMode::color(new_ball_color),
+        //         outline_mode: StrokeMode::new(new_ball_color, 10.0),
+        //     },
+        //     Transform::from_xyz(WINDOWWIDTH / 3.0, WINDOWHEIGHT / 3.0, 1.0),
+        // ))
+        .insert_bundle(SpriteBundle {
+            transform: Transform::from_xyz(WINDOWWIDTH / 3.0, WINDOWHEIGHT / 3.0, 1.0),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(40.0, 40.0)),
+                ..Default::default()
             },
-            Transform::from_xyz(WINDOWWIDTH / 3.0, WINDOWHEIGHT / 3.0, 1.0),
-        ))
+            ..Default::default()
+        })
+        .insert(Velocity {
+            linvel: Vec2::new(-300.0, 0.0),
+            angvel: 0.0,
+        })
         .insert(Ball {
             size: new_ball_size,
         });
@@ -205,6 +219,8 @@ fn check_collisions(
     bullet_entities_query: Query<Entity, With<Bullet>>,
     ball_entities_query: Query<Entity, With<Ball>>,
     player_entity_query: Query<Entity, With<Player>>,
+    wall_entities_query: Query<Entity, With<Wall>>,
+    mut ball_velocity_query: Query<&mut Velocity>,
     mut spawn_event: EventWriter<SpawnBallEvent>,
     mut commands: Commands,
 ) {
@@ -232,6 +248,20 @@ fn check_collisions(
                 commands.entity(player_entity).despawn();
             }
         }
+
+        // for wall_entity in wall_entities_query.iter() {
+        //     if let Some(contact_pair) = rapier_context.contact_pair(ball_entity, wall_entity) {
+        //         if contact_pair.has_any_active_contacts() {
+        //             if let Ok(mut ball_velocity) = ball_velocity_query.get_mut(ball_entity) {
+        //                 println!("Doing stuff");
+        //                 ball_velocity.linvel =
+        //                     Vec2::new(ball_velocity.linvel.x * -1.0, ball_velocity.linvel.y);
+
+        //                 ball_velocity.angvel = 0.0
+        //             }
+        //         }
+        //     }
+        // }
     }
 }
 
@@ -292,59 +322,69 @@ fn spawn_ball(
                     ))
                     // membership and then filter
                     // What group it is a part of and then what group it can interact with
-                    .insert(CollisionGroups::new(0b0000, 0b0000))
+                    // NOTE turning this off for now
+                    // .insert(CollisionGroups::new(0b0000, 0b0000))
                     .insert(Velocity {
-                        linvel: Vec2::new(-300.0, 50.0),
+                        linvel: Vec2::new(-300.0, 300.0),
                         angvel: 0.0,
                     })
                     .insert(Ball {
                         size: new_ball_size,
                     });
 
-                commands
-                    .spawn()
-                    .insert(Collider::ball(new_ball_radius))
-                    .insert(Restitution {
-                        coefficient: 1.0,
-                        combine_rule: CoefficientCombineRule::Max,
-                    })
-                    .insert(RigidBody::Dynamic)
-                    .insert_bundle(GeometryBuilder::build_as(
-                        &circle,
-                        DrawMode::Outlined {
-                            fill_mode: bevy_prototype_lyon::prelude::FillMode::color(
-                                Color::ORANGE_RED,
-                            ),
-                            outline_mode: StrokeMode::new(new_ball_color, 10.0),
-                        },
-                        Transform::from_xyz(
-                            right_ball_x_position,
-                            old_ball_transform.translation.y,
-                            1.0,
-                        ),
-                    ))
-                    // TODO
-                    // This gets the balls to bounce in the right direction.
-                    // But I want them to be more consistent in their "bouncyness".
-                    // When they collide with the ground, I want them to
-                    // continue bouncing with the same speed and distance.
-                    // Like they need to be predictable.
-                    //
-                    // Right now I can tell the velocity is slowing down as it bounces. And I
-                    // really don't want it do that.
-                    // I also need it to bounce more consistently. It should always bounce in the
-                    // direction that it is going unless it hits a wall.
-                    .insert(Velocity {
-                        linvel: Vec2::new(300.0, 50.0),
-                        angvel: 0.0,
-                    })
-                    .insert(Ball {
-                        size: new_ball_size,
-                    });
+                // commands
+                //     .spawn()
+                //     .insert(Collider::ball(new_ball_radius))
+                //     .insert(Restitution {
+                //         coefficient: 1.0,
+                //         combine_rule: CoefficientCombineRule::Max,
+                //     })
+                //     .insert(RigidBody::Dynamic)
+                //     .insert_bundle(GeometryBuilder::build_as(
+                //         &circle,
+                //         DrawMode::Outlined {
+                //             fill_mode: bevy_prototype_lyon::prelude::FillMode::color(
+                //                 Color::ORANGE_RED,
+                //             ),
+                //             outline_mode: StrokeMode::new(new_ball_color, 10.0),
+                //         },
+                //         Transform::from_xyz(
+                //             right_ball_x_position,
+                //             old_ball_transform.translation.y,
+                //             1.0,
+                //         ),
+                //     ))
+                //     // TODO
+                //     // This gets the balls to bounce in the right direction.
+                //     // But I want them to be more consistent in their "bouncyness".
+                //     // When they collide with the ground, I want them to
+                //     // continue bouncing with the same speed and distance.
+                //     // Like they need to be predictable.
+                //     //
+                //     // Right now I can tell the velocity is slowing down as it bounces. And I
+                //     // really don't want it do that.
+                //     // I also need it to bounce more consistently. It should always bounce in the
+                //     // direction that it is going unless it hits a wall.
+                //     .insert(Velocity {
+                //         linvel: Vec2::new(300.0, 50.0),
+                //         angvel: 0.0,
+                //     })
+                //     .insert(Ball {
+                //         size: new_ball_size,
+                //     });
             }
 
             commands.entity(entity).despawn();
         }
+    }
+}
+
+// NOTE for testing purposes
+// I want to figure out what the linear velocity of my ball is at any time
+fn show_velocity(query: Query<&Velocity, With<Ball>>) {
+    for velocity in query.iter() {
+        println!("The linear velocity is {}", velocity.linvel);
+        println!("The angular velocity is {}", velocity.angvel);
     }
 }
 
@@ -360,6 +400,9 @@ fn despawn_bullets(
         }
     }
 }
+
+#[derive(Component)]
+struct Wall;
 
 fn spawn_floor_and_walls(mut commands: Commands) {
     // The floor
@@ -377,7 +420,8 @@ fn spawn_floor_and_walls(mut commands: Commands) {
             transform: Transform::from_xyz(0.0, -WINDOWHEIGHT / 2.0, 1.0),
             ..Default::default()
         })
-        .insert(Collider::cuboid(floor_size_x / 2.0, floor_size_y / 2.0));
+        .insert(Collider::cuboid(floor_size_x / 2.0, floor_size_y / 2.0))
+        .insert(Wall);
 
     // The Left Wall
     let left_wall_size_x = 40.0;
@@ -396,7 +440,8 @@ fn spawn_floor_and_walls(mut commands: Commands) {
         .insert(Collider::cuboid(
             left_wall_size_x / 2.0,
             left_wall_size_y / 2.0,
-        ));
+        ))
+        .insert(Wall);
 
     // The Right Wall
     let right_wall_size_x = 40.0;
@@ -415,5 +460,6 @@ fn spawn_floor_and_walls(mut commands: Commands) {
         .insert(Collider::cuboid(
             right_wall_size_x / 2.0,
             right_wall_size_y / 2.0,
-        ));
+        ))
+        .insert(Wall);
 }
