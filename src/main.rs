@@ -1,18 +1,7 @@
 use bevy::prelude::*;
-use bevy_prototype_lyon::prelude::*;
-use bevy_rapier2d::prelude::*;
-use std::collections::HashMap;
 
 const WINDOWHEIGHT: f32 = 1000.0;
 const WINDOWWIDTH: f32 = 1200.0;
-
-// NOTE the units are pixels for pretty much the whole thing, rapier now deals with the conversion to meters in the backend
-
-#[derive(Default)]
-struct BallMappingResource {
-    ball_radii: HashMap<u8, f32>,
-    ball_colors: HashMap<u8, Color>,
-}
 
 fn main() {
     App::new()
@@ -23,443 +12,53 @@ fn main() {
             ..Default::default()
         })
         .add_plugins(DefaultPlugins)
-        .add_plugin(ShapePlugin)
-        .add_startup_system(spawn_player)
         .add_startup_system(spawn_floor_and_walls)
-        .add_startup_system(spawn_starting_ball)
-        .insert_resource(BallMappingResource {
-            ball_radii: HashMap::from([(1, 10.0), (2, 15.0), (3, 25.0), (4, 35.0), (5, 50.0)]),
-            ball_colors: HashMap::from([
-                (1, Color::ORANGE_RED),
-                (2, Color::AQUAMARINE),
-                (3, Color::FUCHSIA),
-                (4, Color::BEIGE),
-                (5, Color::BISQUE),
-            ]),
-        })
-        .add_event::<SpawnBallEvent>()
-        .add_system(spawn_ball)
-        .add_system(show_velocity)
-        .add_system(player_movement)
-        .add_system(spawn_bullets)
-        .add_system(move_bullets)
-        .add_system(despawn_bullets)
-        .add_system(check_collisions)
-        .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
-        // .add_plugin(RapierDebugRenderPlugin::default())
         .run();
 }
 
-// The float value is the player movement speed in 'pixels/second'.
-#[derive(Component)]
-struct Player(f32);
+fn spawn_floor_and_walls(mut commands: Commands) {
 
-fn spawn_player(mut commands: Commands, mut rapier_config: ResMut<RapierConfiguration>) {
-    // NOTE not really sure why gravity needs to be so big
-    // But I think its dividing by the pixels per meter
-    rapier_config.gravity = Vec2::new(0.0, -1000.0);
     commands
         .spawn()
         .insert_bundle(OrthographicCameraBundle::new_2d());
 
-    let sprite_size = 40.0;
-
-    // Spawn entity with `Player` struct as a component for access in movement query.
-    commands
-        .spawn()
-        .insert_bundle(SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgb(0.0, 0.0, 0.0),
-                custom_size: Some(Vec2::new(sprite_size, sprite_size)),
-                ..Default::default()
-            },
-            transform: Transform::from_xyz(0.0, -WINDOWHEIGHT / 2.0 + WINDOWHEIGHT / 20.0, 1.0),
-            ..Default::default()
-        })
-        .insert(RigidBody::Dynamic)
-        .insert(Velocity::zero())
-        .insert(Collider::cuboid(sprite_size / 2.0, sprite_size / 2.0))
-        .insert(Player(300.0));
-}
-
-fn player_movement(
-    keyboard_input: Res<Input<KeyCode>>,
-    mut player_info: Query<(&Player, &mut Velocity)>,
-) {
-    for (player, mut rb_vels) in player_info.iter_mut() {
-        let left = keyboard_input.pressed(KeyCode::A) || keyboard_input.pressed(KeyCode::Left);
-        let right = keyboard_input.pressed(KeyCode::D) || keyboard_input.pressed(KeyCode::Right);
-
-        let x_axis = -(left as i8) + right as i8;
-
-        let mut move_delta = Vec2::new(x_axis as f32, 0.0);
-        if move_delta != Vec2::ZERO {
-            move_delta /= move_delta.length();
-        }
-
-        // Update the velocity on the rigid_body_component,
-        // the bevy_rapier plugin will update the Sprite transform.
-        rb_vels.linvel = move_delta * player.0;
-    }
-}
-
-#[derive(Component)]
-struct Ball {
-    // Range from 1-5 or something.
-    // The higher numbers would indicate a larger ball
-    // If size is 1, then it is the smallest ball and can be destroyed if hit
-    size: u8,
-}
-
-// Set the restitution coefficient and restitution combine rule
-// when the collider is created.
-// Restitution determines how bouncy the ball is.
-fn spawn_starting_ball(mut commands: Commands, ball_mappings_resource: Res<BallMappingResource>) {
-    let new_ball_size = 2;
-    let new_ball_radius = ball_mappings_resource.ball_radii[&new_ball_size];
-    let new_ball_color = ball_mappings_resource.ball_colors[&new_ball_size];
-
-    let circle = shapes::Circle {
-        radius: new_ball_radius,
-        center: Vec2::new(0.0, 0.0),
-    };
-
-    // TODO the starting ball needs to bounce to either the left or the right to start
-    commands
-        .spawn()
-        .insert(Collider::cuboid(new_ball_radius, new_ball_radius))
-        .insert(Restitution {
-            coefficient: 1.0,
-            combine_rule: CoefficientCombineRule::Max,
-        })
-        .insert(RigidBody::Dynamic)
-        .insert(LockedAxes::ROTATION_LOCKED)
-        // .insert_bundle(GeometryBuilder::build_as(
-        //     &circle,
-        //     DrawMode::Outlined {
-        //         fill_mode: bevy_prototype_lyon::prelude::FillMode::color(new_ball_color),
-        //         outline_mode: StrokeMode::new(new_ball_color, 10.0),
-        //     },
-        //     Transform::from_xyz(WINDOWWIDTH / 3.0, WINDOWHEIGHT / 3.0, 1.0),
-        // ))
-        .insert_bundle(SpriteBundle {
-            transform: Transform::from_xyz(WINDOWWIDTH / 3.0, WINDOWHEIGHT / 3.0, 1.0),
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(40.0, 40.0)),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
-        .insert(Velocity {
-            linvel: Vec2::new(-300.0, 0.0),
-            angvel: 0.0,
-        })
-        .insert(Ball {
-            size: new_ball_size,
-        });
-}
-
-#[derive(Component)]
-struct Bullet;
-
-fn spawn_bullets(
-    keyboard_input: Res<Input<KeyCode>>,
-    player_transform: Query<&Transform, With<Player>>,
-    mut commands: Commands,
-) {
-    let transform = player_transform.single();
-    let spawn_position_x = transform.translation.x;
-    let spawn_position_y = transform.translation.y + 40.0;
-
-    let bullet_size_width = 10.0;
-    let bullet_size_height = 30.0;
-
-    let up = keyboard_input.just_pressed(KeyCode::W) || keyboard_input.just_pressed(KeyCode::Up);
-
-    // TODO might want to limit the total number of bullets that can be
-    // on screen at any time
-    if up {
-        commands
-            .spawn_bundle(SpriteBundle {
-                sprite: Sprite {
-                    color: Color::rgb(10.0, 70.0, 70.0),
-                    custom_size: Some(Vec2::new(bullet_size_width, bullet_size_height)),
-                    ..Default::default()
-                },
-                transform: Transform::from_xyz(spawn_position_x, spawn_position_y, 1.0),
-                ..Default::default()
-            })
-            .insert(Collider::cuboid(
-                bullet_size_width / 2.0,
-                bullet_size_height / 2.0,
-            ))
-            .insert(RigidBody::KinematicPositionBased)
-            .insert(Bullet);
-    }
-}
-
-// NOTE
-// For position-based kinematic bodies, it is recommended to modify its Transform
-// (changing its velocity won’t have any effect). This will let the physics
-// engine compute the fictitious velocity of the kinematic body for more realistic
-// intersections with other rigid-bodies.
-fn move_bullets(mut bullet_positions_query: Query<&mut Transform, With<Bullet>>) {
-    // TODO might want to make the position change relevative to the screen?
-    for mut position in bullet_positions_query.iter_mut() {
-        position.translation.y += 4.5;
-    }
-}
-
-// NOTE I am going to be checking all collisions in bevy rapier in the same system
-// by doing checks for the entities that might have special logic when they collide together
-// I don't love this approach, but I feel like Bevy Rapier pushes me in this direction.
-// I wish it was more flexible, but it is good enough for now.
-fn check_collisions(
-    rapier_context: Res<RapierContext>,
-    bullet_entities_query: Query<Entity, With<Bullet>>,
-    ball_entities_query: Query<Entity, With<Ball>>,
-    player_entity_query: Query<Entity, With<Player>>,
-    wall_entities_query: Query<Entity, With<Wall>>,
-    mut ball_velocity_query: Query<&mut Velocity>,
-    mut spawn_event: EventWriter<SpawnBallEvent>,
-    mut commands: Commands,
-) {
-    let player_entity = player_entity_query.single();
-    for ball_entity in ball_entities_query.iter() {
-        for bullet_entity in bullet_entities_query.iter() {
-            // If a bullet collides with a ball then destroy both the bullet and the ball.
-            if let Some(contact_pair) = rapier_context.contact_pair(bullet_entity, ball_entity) {
-                // The contact pair exists meaning that the broad-phase identified a potential contact.
-                if contact_pair.has_any_active_contacts() {
-                    // The contact pair has active contacts, meaning that it
-                    // contains contacts for which contact forces were computed.
-                    commands.entity(bullet_entity).despawn();
-
-                    spawn_event.send(SpawnBallEvent(ball_entity))
-                }
-            }
-        }
-
-        if let Some(contact_pair) = rapier_context.contact_pair(ball_entity, player_entity) {
-            if contact_pair.has_any_active_contacts() {
-                // TODO when the player gets hit, the game shuts down because we are doing queries that expect
-                // exactly one player to be alive at all times.
-                // This is fine for now, but later on we should have some kind of restart feature and also some kind of menu for restarting
-                commands.entity(player_entity).despawn();
-            }
-        }
-
-        // for wall_entity in wall_entities_query.iter() {
-        //     if let Some(contact_pair) = rapier_context.contact_pair(ball_entity, wall_entity) {
-        //         if contact_pair.has_any_active_contacts() {
-        //             if let Ok(mut ball_velocity) = ball_velocity_query.get_mut(ball_entity) {
-        //                 println!("Doing stuff");
-        //                 ball_velocity.linvel =
-        //                     Vec2::new(ball_velocity.linvel.x * -1.0, ball_velocity.linvel.y);
-
-        //                 ball_velocity.angvel = 0.0
-        //             }
-        //         }
-        //     }
-        // }
-    }
-}
-
-pub struct SpawnBallEvent(pub Entity);
-
-fn spawn_ball(
-    mut spawn_event: EventReader<SpawnBallEvent>,
-    mut spawn_query: Query<(&Transform, &Ball)>,
-    mut commands: Commands,
-    ball_mappings_resource: Res<BallMappingResource>,
-) {
-    for event in spawn_event.iter() {
-        let entity: Entity = event.0;
-
-        if let Ok((old_ball_transform, old_ball)) = spawn_query.get_mut(entity) {
-            let old_ball_size = old_ball.size;
-
-            // Don't spawn a ball if the size is as small as it can go
-            if old_ball_size > 1 {
-                // TODO
-                // So this below isn't really right. We actually want to spawn the balls in the exact same position
-                // But give them some kind of push to the left and right respectively so they bounce in opposite directions.
-                let left_ball_x_position = old_ball_transform.translation.x - WINDOWWIDTH / 16.0;
-                let right_ball_x_position = old_ball_transform.translation.x + WINDOWWIDTH / 16.0;
-
-                let new_ball_size = old_ball_size - 1;
-                let new_ball_radius = ball_mappings_resource.ball_radii[&new_ball_size];
-                let new_ball_color = ball_mappings_resource.ball_colors[&new_ball_size];
-
-                let circle = shapes::Circle {
-                    radius: new_ball_radius,
-                    center: Vec2::new(0.0, 0.0),
-                };
-
-                // TODO I need to add a collision_group to these balls
-                // so that they don't collide with eachother
-                commands
-                    .spawn()
-                    .insert(Collider::ball(new_ball_radius))
-                    .insert(Restitution {
-                        coefficient: 1.0,
-                        combine_rule: CoefficientCombineRule::Max,
-                    })
-                    .insert(RigidBody::Dynamic)
-                    .insert_bundle(GeometryBuilder::build_as(
-                        &circle,
-                        DrawMode::Outlined {
-                            fill_mode: bevy_prototype_lyon::prelude::FillMode::color(
-                                Color::ORANGE_RED,
-                            ),
-                            outline_mode: StrokeMode::new(new_ball_color, 10.0),
-                        },
-                        Transform::from_xyz(
-                            left_ball_x_position,
-                            old_ball_transform.translation.y,
-                            1.0,
-                        ),
-                    ))
-                    // membership and then filter
-                    // What group it is a part of and then what group it can interact with
-                    // NOTE turning this off for now
-                    // .insert(CollisionGroups::new(0b0000, 0b0000))
-                    .insert(Velocity {
-                        linvel: Vec2::new(-300.0, 300.0),
-                        angvel: 0.0,
-                    })
-                    .insert(Ball {
-                        size: new_ball_size,
-                    });
-
-                // commands
-                //     .spawn()
-                //     .insert(Collider::ball(new_ball_radius))
-                //     .insert(Restitution {
-                //         coefficient: 1.0,
-                //         combine_rule: CoefficientCombineRule::Max,
-                //     })
-                //     .insert(RigidBody::Dynamic)
-                //     .insert_bundle(GeometryBuilder::build_as(
-                //         &circle,
-                //         DrawMode::Outlined {
-                //             fill_mode: bevy_prototype_lyon::prelude::FillMode::color(
-                //                 Color::ORANGE_RED,
-                //             ),
-                //             outline_mode: StrokeMode::new(new_ball_color, 10.0),
-                //         },
-                //         Transform::from_xyz(
-                //             right_ball_x_position,
-                //             old_ball_transform.translation.y,
-                //             1.0,
-                //         ),
-                //     ))
-                //     // TODO
-                //     // This gets the balls to bounce in the right direction.
-                //     // But I want them to be more consistent in their "bouncyness".
-                //     // When they collide with the ground, I want them to
-                //     // continue bouncing with the same speed and distance.
-                //     // Like they need to be predictable.
-                //     //
-                //     // Right now I can tell the velocity is slowing down as it bounces. And I
-                //     // really don't want it do that.
-                //     // I also need it to bounce more consistently. It should always bounce in the
-                //     // direction that it is going unless it hits a wall.
-                //     .insert(Velocity {
-                //         linvel: Vec2::new(300.0, 50.0),
-                //         angvel: 0.0,
-                //     })
-                //     .insert(Ball {
-                //         size: new_ball_size,
-                //     });
-            }
-
-            commands.entity(entity).despawn();
-        }
-    }
-}
-
-// NOTE for testing purposes
-// I want to figure out what the linear velocity of my ball is at any time
-fn show_velocity(query: Query<&Velocity, With<Ball>>) {
-    for velocity in query.iter() {
-        println!("The linear velocity is {}", velocity.linvel);
-        println!("The angular velocity is {}", velocity.angvel);
-    }
-}
-
-// If a bullet goes off screen destroy it
-fn despawn_bullets(
-    mut commands: Commands,
-    bullets_query: Query<(Entity, &Transform), With<Bullet>>,
-) {
-    for (entity, transform) in bullets_query.iter() {
-        if transform.translation.y > WINDOWHEIGHT {
-            commands.entity(entity).despawn();
-            println!("Despawned the entity");
-        }
-    }
-}
-
-#[derive(Component)]
-struct Wall;
-
-fn spawn_floor_and_walls(mut commands: Commands) {
     // The floor
     let floor_size_x = WINDOWWIDTH;
     let floor_size_y = 40.0;
 
-    commands
-        .spawn()
-        .insert_bundle(SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgb(10.0, 70.0, 70.0),
-                custom_size: Some(Vec2::new(floor_size_x, floor_size_y)),
-                ..Default::default()
-            },
-            transform: Transform::from_xyz(0.0, -WINDOWHEIGHT / 2.0, 1.0),
+    commands.spawn().insert_bundle(SpriteBundle {
+        sprite: Sprite {
+            color: Color::rgb(10.0, 70.0, 70.0),
+            custom_size: Some(Vec2::new(floor_size_x, floor_size_y)),
             ..Default::default()
-        })
-        .insert(Collider::cuboid(floor_size_x / 2.0, floor_size_y / 2.0))
-        .insert(Wall);
+        },
+        transform: Transform::from_xyz(0.0, -WINDOWHEIGHT / 2.0, 1.0),
+        ..Default::default()
+    });
 
     // The Left Wall
     let left_wall_size_x = 40.0;
     let left_wall_size_y = WINDOWHEIGHT;
-    commands
-        .spawn()
-        .insert_bundle(SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgb(10.0, 70.0, 70.0),
-                custom_size: Some(Vec2::new(left_wall_size_x, left_wall_size_y)),
-                ..Default::default()
-            },
-            transform: Transform::from_xyz(-WINDOWWIDTH / 2.0, 0.0, 1.0),
+    commands.spawn().insert_bundle(SpriteBundle {
+        sprite: Sprite {
+            color: Color::rgb(10.0, 70.0, 70.0),
+            custom_size: Some(Vec2::new(left_wall_size_x, left_wall_size_y)),
             ..Default::default()
-        })
-        .insert(Collider::cuboid(
-            left_wall_size_x / 2.0,
-            left_wall_size_y / 2.0,
-        ))
-        .insert(Wall);
+        },
+        transform: Transform::from_xyz(-WINDOWWIDTH / 2.0, 0.0, 1.0),
+        ..Default::default()
+    });
 
     // The Right Wall
     let right_wall_size_x = 40.0;
     let right_wall_size_y = WINDOWHEIGHT;
-    commands
-        .spawn()
-        .insert_bundle(SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgb(10.0, 70.0, 70.0),
-                custom_size: Some(Vec2::new(left_wall_size_x, left_wall_size_y)),
-                ..Default::default()
-            },
-            transform: Transform::from_xyz(WINDOWWIDTH / 2.0, 0.0, 1.0),
+    commands.spawn().insert_bundle(SpriteBundle {
+        sprite: Sprite {
+            color: Color::rgb(10.0, 70.0, 70.0),
+            custom_size: Some(Vec2::new(right_wall_size_x, right_wall_size_y)),
             ..Default::default()
-        })
-        .insert(Collider::cuboid(
-            right_wall_size_x / 2.0,
-            right_wall_size_y / 2.0,
-        ))
-        .insert(Wall);
+        },
+        transform: Transform::from_xyz(WINDOWWIDTH / 2.0, 0.0, 1.0),
+        ..Default::default()
+    });
 }
