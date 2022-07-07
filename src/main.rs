@@ -15,6 +15,7 @@ fn main() {
         })
         .add_plugins(DefaultPlugins)
         .add_plugin(logic::player::PlayerPlugin)
+        .add_plugin(logic::arrow::ArrowPlugin)
         .add_startup_system(spawn_floor_and_walls)
         .run();
 }
