@@ -94,6 +94,11 @@ fn arrow_collisions(
         .get_single_mut()
         .expect("Error: Could not find a single arrow.");
 
+    // NOTE
+    // Because the way we are growing the arrow is by scaling it.
+    // We calculate the top of the arrow by multiplying it by the scale
+    // and dividing a bunch because the origin point of everything is always
+    // in the middle
     if arrow_transform.scale.y * ARROWHEIGHT / 4.0
         >= ceiling_transform.translation.y - 20.0
     {
