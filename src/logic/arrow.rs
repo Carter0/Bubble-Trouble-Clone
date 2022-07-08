@@ -1,14 +1,16 @@
 use crate::logic::player::Player;
-use crate::{WINDOWHEIGHT, WINDOWWIDTH};
+use crate::{Ceiling, WINDOWHEIGHT, WINDOWWIDTH};
 use bevy::prelude::*;
 
+const ARROWHEIGHT: f32 = 30.0;
 pub struct ArrowPlugin;
 
 impl Plugin for ArrowPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system(spawn_starting_arrow)
             .add_system(spawn_arrow)
-            .add_system(grow_arrow);
+            .add_system(grow_arrow)
+            .add_system(arrow_collisions);
     }
 }
 
@@ -22,13 +24,12 @@ pub struct Arrow {
 // so that there is always one arrow in the game
 fn spawn_starting_arrow(mut commands: Commands) {
     let arrow_width = 10.0;
-    let arrow_height = 30.0;
 
     commands
         .spawn_bundle(SpriteBundle {
             sprite: Sprite {
                 color: Color::rgb(10.0, 70.0, 70.0),
-                custom_size: Some(Vec2::new(arrow_width, arrow_height)),
+                custom_size: Some(Vec2::new(arrow_width, ARROWHEIGHT)),
                 ..Default::default()
             },
             transform: Transform::from_xyz(WINDOWWIDTH, WINDOWHEIGHT, 1.0),
@@ -52,7 +53,7 @@ fn spawn_arrow(
         .get_single_mut()
         .expect("Error: Could not find a single arrow.");
 
-    let spawn_position_x = player_transform.translation.x + 40.0;
+    let spawn_position_x = player_transform.translation.x;
     let spawn_position_y = -WINDOWHEIGHT / 2.0 + 40.0;
 
     let up = keyboard_input.just_pressed(KeyCode::W)
@@ -62,6 +63,7 @@ fn spawn_arrow(
     if up && arrow.destroyed {
         arrow_transform.translation.x = spawn_position_x;
         arrow_transform.translation.y = spawn_position_y;
+        arrow_transform.scale.y = 1.0;
         arrow.destroyed = false;
     }
 }
@@ -73,10 +75,29 @@ fn grow_arrow(mut arrow_query: Query<(&mut Transform, &Arrow), With<Arrow>>) {
         .expect("Error: Could not find a single arrow.");
 
     // A little hacky since it increases it on both directions when we only want the top
+    // TODO make variable depending on screen size
     if !arrow.destroyed {
         transform.scale.y += 0.3;
     }
 }
 
-// TODO
-// fn arrow_collisions() {}
+// If the arrow collides with the ceiling it goes off screen
+fn arrow_collisions(
+    mut arrow_query: Query<(&mut Arrow, &mut Transform), (With<Arrow>, Without<Ceiling>)>,
+    ceiling_query: Query<&Transform, With<Ceiling>>,
+) {
+    let ceiling_transform = ceiling_query
+        .get_single()
+        .expect("Error: Could not find a single ceiling.");
+
+    let (mut arrow, mut arrow_transform) = arrow_query
+        .get_single_mut()
+        .expect("Error: Could not find a single arrow.");
+
+    if arrow_transform.scale.y * ARROWHEIGHT / 4.0
+        >= ceiling_transform.translation.y - 20.0
+    {
+        arrow.destroyed = true;
+        arrow_transform.translation.x = WINDOWWIDTH * 2.0;
+    }
+}

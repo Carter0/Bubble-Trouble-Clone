@@ -26,11 +26,29 @@ struct RightWall;
 #[derive(Component)]
 struct LeftWall;
 
+#[derive(Component)]
+struct Ceiling;
+
 // NOTE Origin point in the middle for all transforms
 fn spawn_floor_and_walls(mut commands: Commands) {
     commands
         .spawn()
         .insert_bundle(OrthographicCameraBundle::new_2d());
+
+    // The ceiling
+    let floor_size_x = WINDOWWIDTH;
+    let floor_size_y = 40.0;
+
+    commands.spawn().insert_bundle(SpriteBundle {
+        sprite: Sprite {
+            color: Color::rgb(10.0, 70.0, 70.0),
+            custom_size: Some(Vec2::new(floor_size_x, floor_size_y)),
+            ..Default::default()
+        },
+        transform: Transform::from_xyz(0.0, WINDOWHEIGHT / 2.0, 1.0),
+        ..Default::default()
+    })
+    .insert(Ceiling);
 
     // The floor
     let floor_size_x = WINDOWWIDTH;
