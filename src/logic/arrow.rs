@@ -1,6 +1,7 @@
 use crate::logic::ball::{Ball, PopBallEvent};
 use crate::logic::player::Player;
-use crate::{Ceiling, WINDOWHEIGHT, WINDOWWIDTH};
+use crate::{WINDOWHEIGHT, WINDOWWIDTH};
+use crate::logic::sides_of_screen::Ceiling;
 use bevy::prelude::*;
 use bevy::sprite::collide_aabb::collide;
 
@@ -79,7 +80,7 @@ fn grow_arrow(mut arrow_query: Query<(&mut Transform, &Arrow), With<Arrow>>) {
     // A little hacky since it increases it on both directions when we only want the top
     // TODO make variable depending on screen size
     if !arrow.destroyed {
-        transform.scale.y += 0.3;
+        transform.scale.y += 0.5;
     }
 }
 

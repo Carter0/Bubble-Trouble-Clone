@@ -1,4 +1,5 @@
-use crate::{RightWall, LeftWall, WINDOWHEIGHT};
+use crate::WINDOWHEIGHT;
+use crate::logic::sides_of_screen::{RightWall, LeftWall};
 use bevy::prelude::*;
 
 pub struct PlayerPlugin;

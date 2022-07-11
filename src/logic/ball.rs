@@ -1,4 +1,4 @@
-use crate::{Floor, LeftWall, RightWall};
+use crate::logic::sides_of_screen::{Floor, LeftWall, RightWall, Ceiling};
 use bevy::prelude::*;
 pub struct BallPlugin;
 use std::collections::HashMap;
@@ -14,14 +14,16 @@ struct BallMappings {
 impl Plugin for BallPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(BallMappings {
+            // TODO should depend on screen size
             ball_sizes: HashMap::from([(1, 20.0), (2, 40.0), (3, 60.0), (4, 80.0), (5, 100.0)]),
-            bounce_velocities: HashMap::from([(1, 6.0), (2, 8.0), (3, 10.0), (4, 12.0), (5, 14.0)]),
+            bounce_velocities: HashMap::from([(1, 6.0), (2, 7.0), (3, 8.0), (4, 9.0), (5, 10.0)]),
         })
         .add_startup_system(spawn_starting_ball)
         .add_system(move_balls)
         .add_system(bounce_balls)
         .add_event::<PopBallEvent>()
-        .add_system(pop_ball);
+        .add_system(pop_ball)
+        .add_system(pop_ball_by_ceiling);
     }
 }
 
@@ -39,8 +41,8 @@ pub struct Ball {
 }
 
 fn spawn_starting_ball(mut commands: Commands, ball_sizes_res: Res<BallMappings>) {
-    let ball_size = 2;
-    let ball_side = ball_sizes_res.ball_sizes[&2];
+    let ball_size = 5;
+    let ball_side = ball_sizes_res.ball_sizes[&ball_size];
 
     commands
         .spawn_bundle(SpriteBundle {
@@ -109,6 +111,23 @@ fn bounce_balls(
     }
 }
 
+// If a ball touches the ceiling it just pops
+fn pop_ball_by_ceiling(
+    ceiling_query: Query<&Transform, With<Ceiling>>,
+    ball_query: Query<(&Transform, &Ball, Entity), Without<Ceiling>>,
+    mut commands: Commands,
+) {
+    let ceiling_transform = ceiling_query
+        .get_single()
+        .expect("Error: Could not find a single ceiling.");
+
+    for (ball_transform, ball, ball_entity) in ball_query.iter() {
+        if ball_transform.translation.y + ball.side / 2.0 >= ceiling_transform.translation.y - 20.0 {
+            commands.entity(ball_entity).despawn();
+        }
+    }
+}
+
 pub struct PopBallEvent(pub Entity);
 
 // When a ball gets popped spawn two smaller balls
@@ -127,6 +146,9 @@ fn pop_ball(
             if ball.size - 1 > 0 {
                 let new_ball_size = ball.size - 1;
                 let new_ball_side = ball_sizes_res.ball_sizes[&(new_ball_size)];
+                // Every newly spawned ball jumps a little
+                // TODO should depend on screen size
+                let new_ball_push = 6.0;
 
                 // NOTE give each ball a 4 point lift so that
                 // its possible they can bounce to the top of the screen
@@ -141,7 +163,7 @@ fn pop_ball(
                         ..Default::default()
                     })
                     .insert(Ball {
-                        y_velocity: 4.0,
+                        y_velocity: new_ball_push,
                         x_velocity: 1.0,
                         side: new_ball_side,
                         size: new_ball_size,
@@ -158,7 +180,7 @@ fn pop_ball(
                         ..Default::default()
                     })
                     .insert(Ball {
-                        y_velocity: 4.0,
+                        y_velocity: new_ball_push,
                         x_velocity: -1.0,
                         side: new_ball_side,
                         size: new_ball_size,
