@@ -46,7 +46,7 @@ fn spawn_starting_arrow(mut commands: Commands) {
 fn spawn_arrow(
     keyboard_input: Res<Input<KeyCode>>,
     player_query: Query<&Transform, With<Player>>,
-    mut arrow_query: Query<(&mut Transform, &mut Arrow), (With<Arrow>, Without<Player>)>,
+    mut arrow_query: Query<(&mut Transform, &mut Arrow), Without<Player>>,
 ) {
     let player_transform = player_query
         .get_single()
@@ -86,7 +86,7 @@ fn grow_arrow(mut arrow_query: Query<(&mut Transform, &Arrow), With<Arrow>>) {
 
 // If the arrow collides with the ceiling it goes off screen
 fn arrow_ceiling_collisions(
-    mut arrow_query: Query<(&mut Arrow, &mut Transform), (With<Arrow>, Without<Ceiling>)>,
+    mut arrow_query: Query<(&mut Arrow, &mut Transform), Without<Ceiling>>,
     ceiling_query: Query<&Transform, With<Ceiling>>,
 ) {
     let ceiling_transform = ceiling_query
@@ -110,7 +110,7 @@ fn arrow_ceiling_collisions(
 
 // If the arrow collides with the ball it goes off screen and the ball gets popped
 fn arrow_ball_collisions(
-    mut arrow_query: Query<(&mut Arrow, &mut Transform), (With<Arrow>, Without<Ball>)>,
+    mut arrow_query: Query<(&mut Arrow, &mut Transform), Without<Ball>>,
     ball_query: Query<(&Transform, &Ball, Entity), With<Ball>>,
     mut pop_ball_event: EventWriter<PopBallEvent>,
 ) {

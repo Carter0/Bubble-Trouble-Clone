@@ -1,6 +1,8 @@
+use crate::logic::ball::Ball;
+use crate::logic::sides_of_screen::{LeftWall, RightWall};
 use crate::WINDOWHEIGHT;
-use crate::logic::sides_of_screen::{RightWall, LeftWall};
 use bevy::prelude::*;
+use bevy::sprite::collide_aabb::collide;
 
 pub struct PlayerPlugin;
 
@@ -8,6 +10,7 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system(spawn_player)
             .add_system(move_player)
+            .add_system(player_ball_collisions)
             .add_system(player_wall_collisions);
     }
 }
@@ -23,12 +26,15 @@ fn spawn_player(mut commands: Commands) {
         .insert_bundle(SpriteBundle {
             sprite: Sprite {
                 color: Color::rgb(10.0, 70.0, 70.0),
+                // TODO This should be a global and also depend on screen size probs
+                // Then again this changes with the sprite so who knows lol
                 custom_size: Some(Vec2::new(40.0, 40.0)),
                 ..Default::default()
             },
             transform: Transform::from_xyz(0.0, -WINDOWHEIGHT / 2.0 + 40.0, 1.0),
             ..Default::default()
         })
+        // TODO should be a percentage of the screen
         .insert(Player { speed: 200.0 });
 }
 
@@ -53,6 +59,32 @@ fn move_player(
     // move the player
     let delta_time = time.delta_seconds();
     transform.translation.x += x_axis as f32 * player.speed * delta_time;
+}
+
+fn player_ball_collisions(
+    player_query: Query<(&Transform, Entity), With<Player>>,
+    ball_query: Query<(&Transform, &Ball), Without<Player>>,
+    mut commands: Commands,
+) {
+    let (player_transform, player_entity) = player_query
+        .get_single()
+        .expect("Error: Could not find a single player.");
+
+    for (ball_transform, ball) in ball_query.iter() {
+        if let Some(_collision) = collide(
+            ball_transform.translation,
+            Vec2::new(ball.side, ball.side),
+            player_transform.translation,
+            Vec2::new(40.0, 40.0),
+        ) {
+
+            // TODO
+            // Add a restart key or a menu or something
+            // This will break the game because our code relies on a player existing
+            // Eventually will need lives
+            commands.entity(player_entity).despawn();
+        }
+    }
 }
 
 fn player_wall_collisions(
