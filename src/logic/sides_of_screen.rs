@@ -23,9 +23,8 @@ pub struct Floor;
 
 // NOTE Origin point in the middle for all transforms
 fn spawn_floor_and_walls(mut commands: Commands) {
-    commands
-        .spawn()
-        .insert_bundle(OrthographicCameraBundle::new_2d());
+    commands.spawn_bundle(Camera2dBundle::default());
+
 
     // The ceiling
     let ceiling_size_x = WINDOWWIDTH;

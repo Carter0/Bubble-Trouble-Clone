@@ -1,8 +1,8 @@
 use crate::logic::ball::Ball;
 use crate::logic::sides_of_screen::{LeftWall, RightWall};
 use crate::WINDOWHEIGHT;
-use bevy::prelude::*;
 use bevy::sprite::collide_aabb::collide;
+use bevy::prelude::*;
 
 pub struct PlayerPlugin;
 
@@ -77,7 +77,6 @@ fn player_ball_collisions(
             player_transform.translation,
             Vec2::new(40.0, 40.0),
         ) {
-
             // TODO
             // Add a restart key or a menu or something
             // This will break the game because our code relies on a player existing
