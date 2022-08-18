@@ -10,6 +10,7 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system(spawn_player)
             .add_startup_system(load_scene_system)
+            .add_system(test)
             .add_system(move_player)
             .add_system(player_ball_collisions)
             .add_system(player_wall_collisions);
@@ -29,8 +30,12 @@ fn load_scene_system(mut commands: Commands, asset_server: Res<AssetServer>) {
         scene: asset_server.load("scenes/test.scn.ron"),
         ..default()
     });
+}
 
-
+fn test(player_query: Query<&Player>) {
+    for player in player_query.iter() {
+        println!("{}", player.speed);
+    }
 }
 
 fn spawn_player(mut commands: Commands) {
@@ -48,7 +53,7 @@ fn spawn_player(mut commands: Commands) {
             ..Default::default()
         })
         // TODO should be a percentage of the screen
-        .insert(Player { speed: 200.0 });
+        .insert(Player { speed: 300.0 });
 }
 
 // Player can only move on the x axis
