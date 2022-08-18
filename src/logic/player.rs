@@ -9,15 +9,28 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system(spawn_player)
+            .add_startup_system(load_scene_system)
             .add_system(move_player)
             .add_system(player_ball_collisions)
             .add_system(player_wall_collisions);
     }
 }
 
-#[derive(Component)]
+#[derive(Component, Reflect)]
 pub struct Player {
     speed: f32,
+}
+
+fn load_scene_system(mut commands: Commands, asset_server: Res<AssetServer>) {
+    // "Spawning" a scene bundle creates a new entity and spawns new instances
+    // of the given scene's entities as children of that entity.
+    commands.spawn_bundle(SceneBundle {
+        // Scenes are loaded just like any other asset.
+        scene: asset_server.load("scenes/test.scn.ron"),
+        ..default()
+    });
+
+
 }
 
 fn spawn_player(mut commands: Commands) {

@@ -1,0 +1,16 @@
+[ // This is an array
+  ( // This is a class, why no name :(
+    entity: 0,
+    components: [
+      {
+        "type": "crate::logic::player::Player",
+        "struct": {
+          "speed": {
+            "type": "f32",
+            "value": 200,
+          },
+        },
+      },
+    ],
+  ),
+]
