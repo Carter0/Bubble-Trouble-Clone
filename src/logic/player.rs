@@ -1,14 +1,16 @@
 use crate::logic::ball::Ball;
 use crate::logic::sides_of_screen::{LeftWall, RightWall};
 use crate::WINDOWHEIGHT;
-use bevy::sprite::collide_aabb::collide;
 use bevy::prelude::*;
+use bevy::sprite::collide_aabb::collide;
 
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_system(spawn_player)
+        // You need to register your types in order to de-serialize them
+        app.register_type::<Player>()
+            .add_startup_system(spawn_player)
             .add_startup_system(load_scene_system)
             .add_system(test)
             .add_system(move_player)
@@ -17,7 +19,8 @@ impl Plugin for PlayerPlugin {
     }
 }
 
-#[derive(Component, Reflect)]
+#[derive(Component, Reflect, Default)]
+#[reflect(Component)] // this tells the reflect derive to also reflect component behaviors
 pub struct Player {
     speed: f32,
 }
@@ -25,11 +28,15 @@ pub struct Player {
 fn load_scene_system(mut commands: Commands, asset_server: Res<AssetServer>) {
     // "Spawning" a scene bundle creates a new entity and spawns new instances
     // of the given scene's entities as children of that entity.
-    commands.spawn_bundle(SceneBundle {
+    commands.spawn_bundle(DynamicSceneBundle {
         // Scenes are loaded just like any other asset.
         scene: asset_server.load("scenes/test.scn.ron"),
         ..default()
     });
+
+    // This tells the AssetServer to watch for changes to assets.
+    // It enables our scenes to automatically reload in game when we modify their files
+    asset_server.watch_for_changes().unwrap();
 }
 
 fn test(player_query: Query<&Player>) {

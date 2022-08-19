@@ -3,7 +3,7 @@
     entity: 0,
     components: [
       {
-        "type": "crate::logic::player::Player",
+        "type": "bubble_trouble_clone::logic::player::Player",
         "struct": {
           "speed": {
             "type": "f32",
