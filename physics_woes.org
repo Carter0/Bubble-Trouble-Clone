@@ -1,0 +1,16 @@
+#+title: Physics Woes
+
+*** What went wrong with physics
+
+So, I started using bevy_rapier2d as it was just updated and I thought I could save some time by using it. At first, it went well. I quickly got a bouncing ball and it came with its own collision system out of the box.
+
+Then I realized I needed my ball to bounce in a particular and predictable way. Most games are not actually true-to-life physics simulations, they are only loosely based on real life physics because they primarly want the player to have fun. Getting a bouncing ball in bevy_rapier2d was not a problem, getting the ball to bounce the way I wanted it to was a big problem.
+
+I'm actually not even sure its possible, to be honest. I suspect what I want might be so simple that rapier has a hard time with it.
+
+Really what I want is when the ball touches the ground, to flip the y velocity when the ball hits the ground, and the x velocity when it hits a wall.
+There are some other bits and boops that need a touch up, but I was stuck on the above.
+
+This might be possible if I could override the default phyics calculations, but I couldn't manage to do it. I asked around in two discords, but no one could answer my question. And now im asking myself, if what I want is supposedly so simple, maybe I should just do it myself.
+
+So here I am, rolling my own physics lol.
